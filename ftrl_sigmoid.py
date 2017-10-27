@@ -21,13 +21,13 @@ def calcu_sigmoid(value_dict,redis_conn):
     r = 0.0
     for (v,w) in zip(values,ws):
         if w is not None:
-            r += float(w)*v
+            t = float(w)
+            if t != 0:
+                r += t*v
     if r > 0:
         t = math.exp(-r)
-        #print 'ddddd %s %s %s\n\n\n\n' % (r,t,1.0/(1.0+t))
         return 1.0/(1.0+t)
     t = math.exp(r)
-    #print 'eeeeeeeeeeeeeeee %s %s %s\n\n\n\n' % (r,t,t/(1.0+t))
     return t/(1.0+t)
 
 class ftrl_sigmoid(threading.Thread):

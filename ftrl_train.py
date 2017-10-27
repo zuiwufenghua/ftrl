@@ -85,48 +85,49 @@ class ftrl_train(threading.Thread):
         杀死
         """
         self.dead = True
-    
+   
     def get_sigmoid_and_gt(self,val_name,wx,train_id,label):
         """
         计算sigmoid，不过会检查是否所有的数据都到达了，然后更新gt
         """
         key = self.train_result_set % train_id
         try:
+            vals = int(self.trainjob_redis_conn.hget(key,'vals'))
+      
             self.trainjob_redis_conn.hincrbyfloat(key,'wx',wx)
+            ok = self.trainjob_redis_conn.hincrby(key,'ok',1)
+            ok = int(ok)
+            if vals > ok:
+                #保证不过期
+                self.trainjob_redis_conn.expire(key,3600)
+                return
+            elif vals < ok:
+                raise Exception('%s ok number is bigger then vals, please check!' % train_id)
+            wx = float(self.trainjob_redis_conn.hget(key,'wx'))
+            if wx > 0:
+                t = math.exp(-wx)
+                sigmoid = 1.0/(1.0+t)
+            else:
+                t = math.exp(wx)
+                sigmoid = t/(1+t)
+            print 'sigmoid is %s %s' % (sigmoid,label)
+            data_dict = json.loads(self.trainjob_redis_conn.hget(key,'data'))
+            alpha = float(self.trainjob_redis_conn.hget(key,'alpha'))
+        
+            #更新
+            for (k,v) in data_dict.iteritems():
+                if v != 0: 
+                    job_thread = self.get_thread(self.gd_threads)
+                    job = [k,alpha,sigmoid,label,v]
+                    job_thread.add_job(job)
+            self.trainjob_redis_conn.delete(key)
         except:
-            print wx
-        self.trainjob_redis_conn.hincrby(key,'ok',1)
-        vals = int(self.trainjob_redis_conn.hget(key,'vals'))
-        ok = int(self.trainjob_redis_conn.hget(key,'ok'))
-        if vals > ok:
-            #print '%s is not all ok!' % train_id
-            return
-        elif vals < ok:
-            #print '%s ok nomber is bigger then vals, please check!' % train_id
-            exit(-1)
+            #清空数据
+            self.trainjob_redis_conn.delete(key)
+            traceback.print_exc()
+            print 'delete %s \n\n\n' % key
         
-        #print '%s is all ok!' % train_id   
-        wx = float(self.trainjob_redis_conn.hget(key,'wx'))
-        if wx > 0:
-            t = math.exp(-wx)
-            sigmoid = 1.0/(1.0+t)
-        else:
-            t = math.exp(wx)
-            sigmoid = t/(1+t)
-        print 'sigmoid is %s %s' % (sigmoid,label)
-        data_dict = json.loads(self.trainjob_redis_conn.hget(key,'data'))
-        alpha = float(self.trainjob_redis_conn.hget(key,'alpha'))
-        
-        #更新
-        for (k,v) in data_dict.iteritems():
-            if v != 0: 
-                job_thread = self.get_thread(self.gd_threads)
-                job = [k,alpha,sigmoid,label,v]
-                job_thread.add_job(job)
-                
-        #清空数据
-        self.trainjob_redis_conn.delete(key)
-         
+
     def get_train_job(self,job_str):
         try:
             _id = get_md5(job_str)
@@ -137,20 +138,25 @@ class ftrl_train(threading.Thread):
             lambda_1 = job['lambda_1']
             lambda_2 = job['lambda_2']
             y = job['label']
-            job_thread = self.get_thread(self.updater_threads)
-
-            n = 0
-            
+            #job_thread = self.get_thread(self.updater_threads) 
+            tmp_dict = {}           
+            jobs = []
+             
             for (k,v) in data_dict.iteritems():
                 if v != 0:
                     updater_job = [k,alpha,beta,lambda_1,lambda_2,self.get_sigmoid_and_gt,_id,y,v]
-                    job_thread.add_job(updater_job)
-                    n += 1
+                    jobs.append(updater_job)
+                    tmp_dict[k] = v
+
+            d = {'vals':len(tmp_dict),'wx':0.0,'ok':0,'data':json.dumps(tmp_dict),'alpha':alpha}
             key = self.train_result_set % _id
-            #保存该条记录的数据
-            d = {'vals':n,'wx':0.0,'ok':0,'data':json.dumps(data_dict),'alpha':alpha}
+           
             self.trainjob_redis_conn.hmset(key,d)
-            self.trainjob_redis_conn.expire(key,3600) 
+            self.trainjob_redis_conn.expire(key,3600)
+            for job in jobs:
+                job_thread = self.get_thread(self.updater_threads)
+                job_thread.add_job(job)
+            
             return True
         except:
             traceback.print_exc()

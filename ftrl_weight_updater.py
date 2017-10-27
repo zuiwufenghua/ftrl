@@ -109,15 +109,12 @@ class ftrl_weight_updater(threading.Thread):
                 
                 z = self.get_z_value(val_name)
                 w = 0
-                
+                 
                 if abs(z) > lambda_1:
                     n = self.get_n_value(val_name)
                     tmp = -1 if z  < 0 else 1
                     w = -(z - tmp*lambda_1)/((beta+math.sqrt(n))/alpha+lambda_2)
-                    '''
-                    if val_name == 'first_level_std_detail_len':
-                        print 'first_level_std_detail_len:%s' % w   
-                    '''
+                #print '%s,%s,%s,%s\n\n' % (z,val_name,w,x)
                 self.update_w(val_name,w)
                 #回调
                 if call_back is not None:

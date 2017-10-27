@@ -109,6 +109,7 @@ class ftrl_gd(threading.Thread):
                     time.sleep(self.sleep_time)
                     continue
                 job = self.job_queue.get_nowait()
+                #print job
                 val_name,alpha,pscore,score,x = job[0],job[1],job[2],job[3],job[4]
                 
                 g = (pscore-score)*x
@@ -118,10 +119,6 @@ class ftrl_gd(threading.Thread):
                 w = self.get_w_value(val_name)
                 self.update_z(val_name,g-delta*w)
                 self.update_n(val_name,g*g)
-                '''
-                if val_name == 'first_level_std_detail_len':
-                    print tmp,g-delta*w,pscore,score
-                '''
             except:
                 traceback.print_exc()
 

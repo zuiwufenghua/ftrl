@@ -38,7 +38,10 @@ class ftrl_predict(threading.Thread):
         
         #auc计算的缓存
         self.auc_cache = 'AUC_CACHE'
-        
+       
+        #auc result
+        self.test_result_cache = 'TEST_RESULT'
+ 
         #是否停止更新
         self.stop_update = False
         
@@ -99,14 +102,14 @@ class ftrl_predict(threading.Thread):
         tmp = map(lambda _:1 if _ > 0.5 else 0 ,list(y_test))
         precision = metrics.precision_score(y, tmp)  
         recall = metrics.recall_score(y, tmp) 
-        print '\n\n\n'
-        print 'precision:',precision
-        print 'recall:',recall
-        print 'f1:', 2.0/(1.0/precision+1.0/recall)
-        print 'auc:',metrics.roc_auc_score(y,y_test) 
-        print '\n\n\n'
-        #return metrics.roc_auc_score(y_test, y)
-    
+        auc = metrics.roc_auc_score(y,y_test)
+        if precision != 0 and recall != 0:
+            f1 = 2.0/(1.0/precision+1.0/recall)
+        else:
+            f1 = 0
+        data = {'precision':precision,'recall':recall,'auc':auc,'f1':f1,'length':len(y)}
+        self.predictjob_redis_conn.rpush(self.test_result_cache,json.dumps(data))
+     
     def add_to_result_set(self,y,y_test):
         """
         添加到结果集合

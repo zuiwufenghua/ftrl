@@ -72,7 +72,7 @@ def process(config):
     join_threads(ftrl_predict_threads)
     
 if __name__ == '__main__':
-    config_path = sys.argv[1]
+    config_path = '../config/config.json'#sys.argv[1]
     config = load_config(config_path)
     process(config)
     
